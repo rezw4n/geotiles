@@ -16,6 +16,7 @@ declare global {
   }
 }
 
+// Add proj4 to the window object for libraries that expect it globally
 if (typeof window !== 'undefined') {
   window.proj4 = proj4;
 }
@@ -69,6 +70,12 @@ const MapViewer: React.FC<MapViewerProps> = ({ geoTiffData, isProcessing }) => {
           geoRasterLayerRef.current = null;
         }
 
+        // Ensure proj4 is properly initialized before proceeding
+        if (typeof window.proj4 !== 'function') {
+          console.log('Reinitializing proj4');
+          window.proj4 = proj4;
+        }
+
         // Dynamically import the geotiff parser
         const { fromArrayBuffer } = await import('geotiff');
         
@@ -84,14 +91,19 @@ const MapViewer: React.FC<MapViewerProps> = ({ geoTiffData, isProcessing }) => {
           throw new Error("Missing georeferencing information");
         }
         
-        // Import the libraries dynamically to avoid server-side rendering issues
-        const { default: parseGeoraster } = await import('georaster');
-        const { default: GeoRasterLayer } = await import('georaster-layer-for-leaflet');
+        // Import georaster & georaster-layer-for-leaflet dynamically
+        // We use dynamic imports to avoid SSR issues
+        console.log('Importing georaster libraries...');
+        const geo = await import('georaster');
+        const GeoRasterLayerModule = await import('georaster-layer-for-leaflet');
         
-        // Parse the GeoTIFF data using georaster
-        const georaster = await parseGeoraster(geoTiffData);
+        console.log('Parsing GeoTIFF with georaster...');
+        // Parse with georaster
+        const georaster = await geo.default(geoTiffData);
         
-        // Create GeoRasterLayer
+        console.log('Creating GeoRasterLayer...');
+        // Create the layer
+        const GeoRasterLayer = GeoRasterLayerModule.default;
         const layer = new GeoRasterLayer({
           georaster,
           opacity: 0.8,
@@ -99,6 +111,7 @@ const MapViewer: React.FC<MapViewerProps> = ({ geoTiffData, isProcessing }) => {
         });
 
         // Add the layer to the map
+        console.log('Adding layer to map...');
         layer.addTo(mapRef.current);
         geoRasterLayerRef.current = layer;
 
@@ -115,7 +128,9 @@ const MapViewer: React.FC<MapViewerProps> = ({ geoTiffData, isProcessing }) => {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Failed to process the GeoTIFF file. Please try again with a different file.",
+          description: error instanceof Error 
+            ? `Failed to process GeoTIFF: ${error.message}` 
+            : "Failed to process the GeoTIFF file. Please try again.",
         });
       }
     };

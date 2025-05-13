@@ -11,18 +11,25 @@ export class ProcessingService {
   // This method processes the GeoTIFF file and returns the data
   static async processGeoTIFF(file: File): Promise<ProcessingResult> {
     try {
+      console.log(`Processing file: ${file.name}, size: ${file.size} bytes`);
+      
       // Read the file as ArrayBuffer
       const arrayBuffer = await this.readFileAsArrayBuffer(file);
+      console.log("File read as ArrayBuffer successfully");
       
       // Validate the GeoTIFF
+      console.log("Validating GeoTIFF...");
       const validationResult = await this.validateGeoTIFF(arrayBuffer);
       
       if (!validationResult.valid) {
+        console.error("GeoTIFF validation failed:", validationResult.error);
         return {
           success: false,
           error: validationResult.error || "Invalid GeoTIFF format or missing georeferencing information",
         };
       }
+      
+      console.log("GeoTIFF validation successful");
       
       // In a real application, we would do more processing here
       // like creating tiles, MBTiles, etc.
@@ -61,25 +68,46 @@ export class ProcessingService {
   // Improved validation for GeoTIFF files
   private static async validateGeoTIFF(arrayBuffer: ArrayBuffer): Promise<{valid: boolean, error?: string}> {
     try {
+      console.log("Parsing GeoTIFF with geotiff library...");
       const tiff = await fromArrayBuffer(arrayBuffer);
       const image = await tiff.getImage();
       
+      console.log("Checking for georeferencing information...");
       // Check for some basic georeferencing info
       const fileDirectory = image.getFileDirectory();
+      
+      // Log file directory keys to help diagnose issues
+      console.log("File directory keys:", Object.keys(fileDirectory));
+      
       const geoKeys = fileDirectory.GeoKeyDirectory;
       
       if (!geoKeys) {
-        return { valid: false, error: "Missing georeferencing information in GeoTIFF" };
+        console.log("No GeoKeyDirectory found, checking for ModelTiepoint...");
+        // Some GeoTIFFs use ModelTiepoint instead of GeoKeyDirectory
+        const modelTiepoint = fileDirectory.ModelTiepoint;
+        const modelPixelScale = fileDirectory.ModelPixelScale;
+        
+        if (!modelTiepoint && !modelPixelScale) {
+          return { valid: false, error: "Missing georeferencing information in GeoTIFF" };
+        }
       }
       
-      // Additional validation could be added here
-      // Check if raster has pixel values
+      // Additional validation - check raster dimensions
       const width = image.getWidth();
       const height = image.getHeight();
+      
+      console.log(`Raster dimensions: ${width}x${height}`);
       
       if (width <= 0 || height <= 0) {
         return { valid: false, error: "Invalid raster dimensions" };
       }
+      
+      // Check for sample format
+      console.log("Checking sample format...");
+      const sampleFormat = fileDirectory.SampleFormat || [1];
+      const bitsPerSample = fileDirectory.BitsPerSample || [1];
+      
+      console.log(`Sample format: ${sampleFormat}, Bits per sample: ${bitsPerSample}`);
       
       return { valid: true };
     } catch (error) {
