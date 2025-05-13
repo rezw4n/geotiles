@@ -14,14 +14,13 @@ export class ProcessingService {
       // Read the file as ArrayBuffer
       const arrayBuffer = await this.readFileAsArrayBuffer(file);
       
-      // For now, we're just validating the GeoTIFF and returning the ArrayBuffer
-      // In a production application, we would convert to the requested format here
-      const isValid = await this.validateGeoTIFF(arrayBuffer);
+      // Validate the GeoTIFF
+      const validationResult = await this.validateGeoTIFF(arrayBuffer);
       
-      if (!isValid) {
+      if (!validationResult.valid) {
         return {
           success: false,
-          error: "Invalid GeoTIFF format or missing georeferencing information",
+          error: validationResult.error || "Invalid GeoTIFF format or missing georeferencing information",
         };
       }
       
@@ -59,21 +58,36 @@ export class ProcessingService {
     });
   }
 
-  // Validate GeoTIFF and check if it has georeferencing information
-  private static async validateGeoTIFF(arrayBuffer: ArrayBuffer): Promise<boolean> {
+  // Improved validation for GeoTIFF files
+  private static async validateGeoTIFF(arrayBuffer: ArrayBuffer): Promise<{valid: boolean, error?: string}> {
     try {
       const tiff = await fromArrayBuffer(arrayBuffer);
       const image = await tiff.getImage();
       
       // Check for some basic georeferencing info
       const fileDirectory = image.getFileDirectory();
-      const geoKeys = fileDirectory.GeoAsciiParams || fileDirectory.GeoKeyDirectory;
+      const geoKeys = fileDirectory.GeoKeyDirectory;
       
-      // We could implement more thorough validation in a production app
-      return !!geoKeys;
+      if (!geoKeys) {
+        return { valid: false, error: "Missing georeferencing information in GeoTIFF" };
+      }
+      
+      // Additional validation could be added here
+      // Check if raster has pixel values
+      const width = image.getWidth();
+      const height = image.getHeight();
+      
+      if (width <= 0 || height <= 0) {
+        return { valid: false, error: "Invalid raster dimensions" };
+      }
+      
+      return { valid: true };
     } catch (error) {
       console.error("Error validating GeoTIFF:", error);
-      return false;
+      return { 
+        valid: false, 
+        error: error instanceof Error ? `Validation error: ${error.message}` : "Unknown error validating GeoTIFF" 
+      };
     }
   }
 

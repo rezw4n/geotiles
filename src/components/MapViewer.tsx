@@ -7,10 +7,18 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from "@/hooks/use-toast";
+import proj4 from 'proj4';
 
-// Importing GeoRaster related imports - we'll use these in the processGeoTiff function
-// These imports will be dynamically loaded within the component instead of at the top level
-// to avoid SSR issues
+// Define window.proj4 to ensure compatibility with georaster-layer-for-leaflet
+declare global {
+  interface Window {
+    proj4: any;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.proj4 = proj4;
+}
 
 interface MapViewerProps {
   geoTiffData: ArrayBuffer | null;
@@ -61,14 +69,28 @@ const MapViewer: React.FC<MapViewerProps> = ({ geoTiffData, isProcessing }) => {
           geoRasterLayerRef.current = null;
         }
 
+        // Dynamically import the geotiff parser
+        const { fromArrayBuffer } = await import('geotiff');
+        
+        // First parse the GeoTIFF using geotiff library
+        const tiff = await fromArrayBuffer(geoTiffData);
+        const image = await tiff.getImage();
+        
+        // Get basic metadata
+        const fileDirectory = image.getFileDirectory();
+        const geoKeys = fileDirectory.GeoKeyDirectory;
+        
+        if (!geoKeys) {
+          throw new Error("Missing georeferencing information");
+        }
+        
         // Import the libraries dynamically to avoid server-side rendering issues
         const { default: parseGeoraster } = await import('georaster');
         const { default: GeoRasterLayer } = await import('georaster-layer-for-leaflet');
-
-        // Parse the GeoTIFF data
-        const arrayBuffer = geoTiffData;
-        const georaster = await parseGeoraster(arrayBuffer);
-
+        
+        // Parse the GeoTIFF data using georaster
+        const georaster = await parseGeoraster(geoTiffData);
+        
         // Create GeoRasterLayer
         const layer = new GeoRasterLayer({
           georaster,
