@@ -80,16 +80,15 @@ export class ProcessingService {
       console.log("File directory keys:", Object.keys(fileDirectory));
       
       const geoKeys = fileDirectory.GeoKeyDirectory;
+      const modelTiepoint = fileDirectory.ModelTiepoint;
+      const modelPixelScale = fileDirectory.ModelPixelScale;
       
-      if (!geoKeys) {
-        console.log("No GeoKeyDirectory found, checking for ModelTiepoint...");
-        // Some GeoTIFFs use ModelTiepoint instead of GeoKeyDirectory
-        const modelTiepoint = fileDirectory.ModelTiepoint;
-        const modelPixelScale = fileDirectory.ModelPixelScale;
-        
-        if (!modelTiepoint && !modelPixelScale) {
-          return { valid: false, error: "Missing georeferencing information in GeoTIFF" };
-        }
+      // Check if either GeoKeyDirectory or ModelTiepoint + ModelPixelScale exists
+      if (!geoKeys && (!modelTiepoint || !modelPixelScale)) {
+        return { 
+          valid: false, 
+          error: "Missing georeferencing information in GeoTIFF. File needs GeoKeyDirectory or ModelTiepoint/ModelPixelScale." 
+        };
       }
       
       // Additional validation - check raster dimensions
@@ -120,20 +119,20 @@ export class ProcessingService {
   }
 
   // Method to export as MBTiles - in a real application, this would generate MBTiles
-  static exportAsMBTiles(data: ArrayBuffer): Blob {
+  static exportAsMBTiles(data: ArrayBuffer, fileName: string = 'export'): Blob {
     // This is a placeholder. In a real app, we'd convert the GeoTIFF to MBTiles format
     // For now, just returning the data as a Blob
     return new Blob([data], { type: 'application/octet-stream' });
   }
 
   // Method to export as Tile Directory - in a real application, this would generate a zip with tiles
-  static exportAsTileDirectory(data: ArrayBuffer): Blob {
+  static exportAsTileDirectory(data: ArrayBuffer, fileName: string = 'export', minZoom: number = 10, maxZoom: number = 16): Blob {
     // This is a placeholder
     return new Blob([data], { type: 'application/zip' });
   }
 
   // Method to export WMTS capabilities XML
-  static generateWMTSCapabilities(layerName: string): string {
+  static generateWMTSCapabilities(layerName: string, minZoom: number = 10, maxZoom: number = 16): string {
     // This would generate a WMTS capabilities XML in a real application
     return `<?xml version="1.0" encoding="UTF-8"?>
       <Capabilities xmlns="http://www.opengis.net/wmts/1.0" 
@@ -148,9 +147,28 @@ export class ProcessingService {
           <Layer>
             <ows:Title>${layerName}</ows:Title>
             <ows:Identifier>${layerName}</ows:Identifier>
-            <!-- Additional layer information would go here -->
+            <MinScaleDenominator>${minZoom}</MinScaleDenominator>
+            <MaxScaleDenominator>${maxZoom}</MaxScaleDenominator>
           </Layer>
         </Contents>
       </Capabilities>`;
+  }
+  
+  // Method to export WMS capabilities XML
+  static generateWMSCapabilities(layerName: string): string {
+    // This would generate a WMS capabilities XML in a real application
+    return `<?xml version="1.0" encoding="UTF-8"?>
+      <WMS_Capabilities version="1.3.0" xmlns="http://www.opengis.net/wms">
+        <Service>
+          <Name>WMS</Name>
+          <Title>GeoTIFF Visualizer WMS</Title>
+        </Service>
+        <Capability>
+          <Layer>
+            <Title>${layerName}</Title>
+            <Name>${layerName}</Name>
+          </Layer>
+        </Capability>
+      </WMS_Capabilities>`;
   }
 }
