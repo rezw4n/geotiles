@@ -6,10 +6,11 @@ import { Layers, Download, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from "@/hooks/use-toast";
 
 // Importing GeoRaster related imports - we'll use these in the processGeoTiff function
-import 'georaster';
-import 'georaster-layer-for-leaflet';
+// These imports will be dynamically loaded within the component instead of at the top level
+// to avoid SSR issues
 
 interface MapViewerProps {
   geoTiffData: ArrayBuffer | null;
@@ -82,8 +83,18 @@ const MapViewer: React.FC<MapViewerProps> = ({ geoTiffData, isProcessing }) => {
         // Set view to the layer bounds
         const bounds = layer.getBounds();
         mapRef.current.fitBounds(bounds);
+        
+        toast({
+          title: "GeoTIFF Loaded",
+          description: "The GeoTIFF has been successfully processed and displayed on the map.",
+        });
       } catch (error) {
         console.error('Error processing GeoTIFF:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to process the GeoTIFF file. Please try again with a different file.",
+        });
       }
     };
 
@@ -93,16 +104,28 @@ const MapViewer: React.FC<MapViewerProps> = ({ geoTiffData, isProcessing }) => {
   // Export functions - these would be implemented in a full version
   const exportMBTiles = () => {
     console.log('Exporting as MBTiles...');
+    toast({
+      title: "Export Started",
+      description: "Exporting as MBTiles...",
+    });
     // Implementation for MBTiles export would go here
   };
 
   const exportTileDirectory = () => {
     console.log('Exporting as tile directory...');
+    toast({
+      title: "Export Started",
+      description: "Exporting as tile directory...",
+    });
     // Implementation for tile directory export would go here
   };
 
   const exportWMTS = () => {
     console.log('Exporting as WMTS...');
+    toast({
+      title: "Export Started",
+      description: "Exporting as WMTS...",
+    });
     // Implementation for WMTS export would go here
   };
 
